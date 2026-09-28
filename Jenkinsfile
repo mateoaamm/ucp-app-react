@@ -8,7 +8,7 @@ pipeline {
 
 
    stages {
-       // Etapa 1: Checkout del código desde GitHub
+       // Etapa 1: Checkout del cÃ³digo desde GitHub
        stage('Checkout') {
            steps {
                git branch: 'main', url: 'https://github.com/mateoaamm/ucp-app-react.git'
@@ -52,7 +52,7 @@ pipeline {
                    URL Build: ${env.BUILD_URL}
                    Detalles de Pruebas: ${env.BUILD_URL}testReport/
                """,
-               to: 'tu-email@example.com' // Reemplaza con tu email
+               to: 'mateoarroyave26@gmail.com' // Reemplaza con tu email
            )
        }
    }
