@@ -2,7 +2,15 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'Node_24'
+        nodejs 'Node_24'                      // Manage Jenkins > Tools > NodeJS
+    }
+
+    environment {
+        SCANNER_HOME = tool 'SonarScanner'    // Manage Jenkins > Tools > SonarQube Scanner
+    }
+
+    options {
+        timeout(time: 20, unit: 'MINUTES')    // ningún build queda colgado
     }
 
     stages {
@@ -13,16 +21,16 @@ pipeline {
             }
         }
 
-        stage('Build') {
+        stage('Install') {
             steps {
-                sh 'npm install'
-                sh 'npm run build'
+                sh 'npm ci'                   // instala exactamente lo de package-lock.json
             }
         }
 
-        stage('Pruebas Unitarias') {
+        stage('Pruebas Unitarias + Cobertura') {
             steps {
-                sh 'npm test -- --watchAll=false --ci --reporters=default --reporters=jest-junit'
+                // Una sola corrida: genera junit.xml (Jenkins) y coverage/lcov.info (SonarQube)
+                sh 'npm test -- --watchAll=false --ci --coverage --reporters=default --reporters=jest-junit'
             }
 
             post {
@@ -30,6 +38,28 @@ pipeline {
                     junit 'junit.xml'
                     archiveArtifacts artifacts: 'junit.xml',
                                      allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'npm run build'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {   // System > SonarQube servers > Name
+                    sh '"$SCANNER_HOME/bin/sonar-scanner" -Dsonar.nodejs.executable="$(command -v node)"'
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
@@ -43,6 +73,7 @@ pipeline {
                     Estado: ${currentBuild.currentResult}
                     URL Build: ${env.BUILD_URL}
                     Detalles de Pruebas: ${env.BUILD_URL}testReport/
+                    Calidad (SonarQube): http://localhost:9000/dashboard?id=ucp-app-react
                 """,
                 to: 'mateoarroyave26@gmail.com'
             )
@@ -62,7 +93,8 @@ Build: #${BUILD_NUMBER}
 Rama: main
 Estado: SUCCESS
 
-Build y pruebas ejecutados correctamente.
+Build, pruebas y analisis SonarQube OK.
+Quality Gate: aprobado.
 
 URL Jenkins:
 ${BUILD_URL}"
@@ -90,7 +122,7 @@ Build: #${BUILD_NUMBER}
 Rama: main
 Estado: FAILURE
 
-El pipeline ha fallado.
+El pipeline ha fallado (pruebas, build o Quality Gate).
 Revisar Console Output en Jenkins.
 
 URL Jenkins:
